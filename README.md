@@ -6,6 +6,36 @@ transfer enabled) and it will check your relay configuration. The sent emails
 should contain information about which test was performed, respectively, and if
 it's a good or bad thing that the email actually came through.
 
+## Testcases
+Here's a detailed breakdown of the testcases:
+
+  * InsecureAuthenticationTest: Try to login to the MTA without a secure (TLS)
+    connection. This must fail because otherwise the password is transmitted in
+    clear text over the Internet without you realizing it.
+  * WrongPasswordTest: Login with wrong password. Must fail.
+  * RightPasswordTest: Login with correct password. Must succeed.
+  * AuthenticatedSelfMailTest: Authenticate and send an email to self. Must
+    succeed.
+  * UnauthenticatedSelfMailTest: Do not authenticate and send an email address
+    from own address to myself. Should fail.
+  * InvalidFromAddressOwnDomain: Send from an email address that does not exist
+    (aaaaaaaa@{MYDOMAIN}, where {MYDOMAIN} is replaced by your own domain).
+    Should fail in case there is no catchall/wildcard match, otherwise should
+    succeed.
+  * InvalidFromAddressPeerDomain: Send an email address from a valid address
+    that the MTA handles to yourself. This should fail because you should not
+    be authorized to use that address.
+  * InvalidFromAddressRelayDomain: Send am email address over your own MTA
+    using a from address that your MTA does not handle at all. Must fail.
+  * AuthenticatedOpenRelay: Authenticate and try to use as a relay (i.e., the
+    FROM address is not handled at all my the MTA and neither is the RCPT
+    address). Must fail.
+  * UnauthenticatedOpenRelay: Same as AuthenticatedOpenRelay, but don't even
+    bother to authenticate. Must fail.
+  * AuthenticatedForgedFromHeader: Authenticate, but have a mismatched envelope
+    FROM  from the actual mail "From" header. Should fail, but might be
+    acceptable to pass (depending on your configuration).
+
 ## Usage
 The usage is quite straightforward:
 
