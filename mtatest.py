@@ -260,21 +260,25 @@ class UnauthenticatedSelfMailTest(AuthenticatedSelfMailTest):
 class InvalidFromAddressOwnDomain(AuthenticatedSelfMailTest):
 	def setup(self):
 		super().setup()
+		self._prerequisites += [ Prerequisite.ValidEmailAddressAvailable ]
 		self._expect = [ ExpectedResult.EarlyRejection, ExpectedResult.DeferredRejection ]
 		self._text = "Sending an email from an address that we don't own, but that's our own domain."
-		self._from_addr = "aaaaaaaaaaaa@" + self._valid_address.split("@")[1]
+		if self._valid_address is not None:
+			self._from_addr = "aaaaaaaaaaaa@" + self._valid_address.split("@")[1]
 
-class InvalidFromAddressPeerDomain(InvalidFromAddressOwnDomain):
+class InvalidFromAddressPeerDomain(AuthenticatedSelfMailTest):
 	def setup(self):
 		super().setup()
 		self._prerequisites += [ Prerequisite.ValidNoAuthorizedAddressAvailable ]
+		self._expect = [ ExpectedResult.EarlyRejection, ExpectedResult.DeferredRejection ]
 		self._text = "Sending an email from an address that the MTA handles, but that our user does not have any access to."
 		self._from_addr = self._valid_address_noauth
 
-class InvalidFromAddressRelayDomain(InvalidFromAddressOwnDomain):
+class InvalidFromAddressRelayDomain(AuthenticatedSelfMailTest):
 	def setup(self):
 		super().setup()
 		self._prerequisites += [ Prerequisite.RelayEmailAddressAvailable ]
+		self._expect = [ ExpectedResult.EarlyRejection, ExpectedResult.DeferredRejection ]
 		self._text = "Sending an email from an address that we don't own, not even our own domain."
 		self._from_addr = self._valid_relay_address
 
