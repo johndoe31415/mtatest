@@ -27,6 +27,7 @@ import getpass
 import argparse
 import logging
 import enum
+import socket
 import email.utils
 from email.mime.text import MIMEText
 from FriendlyArgumentParser import FriendlyArgumentParser
@@ -151,6 +152,7 @@ class MailTesterTestcase(object):
 				conn = smtplib.SMTP_SSL(host = self._server_address.host)
 			if (self._server_address.proto == "smtp") and self._starttls:
 				conn.starttls()
+
 			phase = ConnectionPhase.Connected
 
 			if self._auth_username is not None:
@@ -214,6 +216,45 @@ class MailTesterTestcase(object):
 
 	def setup(self):
 		raise NotImplementedError()
+
+class GenericTest():
+	def __init__(self, **kwargs):
+		self._args = kwargs
+
+	def	check_prerequisites(self):
+		return True
+
+	def run(self):
+		raise NotImplementedError()
+
+class MTAHelloTest(GenericTest):
+	def run(self):
+		address = self._args["server_address"]
+		if address.proto == "smtp":
+			conn = None
+			try:
+				conn = socket.create_connection((address.host, address.port))
+				data = conn.recv(1024)
+				data = data.decode("utf-8").rstrip("\r\n")
+				split_data = data.split()
+				if not data.startswith("220 "):
+					return (TestResult.Failed, "Expected 220 greeting, received: %s" % (data))
+				if len(split_data) < 4:
+					return (TestResult.Failed, "Expected at least four tokens in 220 greeting, received: %s" % (data))
+				if split_data[1] != address.host:
+					return (TestResult.Failed, "Hostname mismatch in 220 greeting, we connected to %s but server advertieses %s" % (address.host, split_data[1]))
+				if split_data[2] != "ESMTP":
+					return (TestResult.Failed, "MTA does not advertise ESMTP.")
+				return (TestResult.Success, "220 greeting advertising ESMTP and hostname matches up with server indication.")
+			except socket.gaierror as e:
+				return (TestResult.Failed, "Error connecting to %s:%d: %s" % (address.host, address.port, str(e)))
+
+			finally:
+				if conn is not None:
+					conn.close()
+			return (TestResult.Success, "OK")
+		else:
+			return (TestResult.Failed, "Protocol not implemented: %s" % (address.proto))
 
 class InsecureAuthenticationTest(MailTesterTestcase):
 	def setup(self):
@@ -309,7 +350,7 @@ class AuthenticatedForgedFromHeader(AuthenticatedSelfMailTest):
 class MailTester(object):
 	_ConnParameters = collections.namedtuple("ConnParameters", [ "username", "passphrase", "starttls" ])
 	_log = logging.getLogger("smtptest")
-	_TestSuite = [ InsecureAuthenticationTest, WrongPasswordTest, RightPasswordTest, AuthenticatedSelfMailTest, UnauthenticatedSelfMailTest, InvalidFromAddressOwnDomain, InvalidFromAddressPeerDomain, InvalidFromAddressRelayDomain, UnauthenticatedOpenRelay, AuthenticatedOpenRelay, AuthenticatedForgedFromHeader ]
+	_TestSuite = [ MTAHelloTest, InsecureAuthenticationTest, WrongPasswordTest, RightPasswordTest, AuthenticatedSelfMailTest, UnauthenticatedSelfMailTest, InvalidFromAddressOwnDomain, InvalidFromAddressPeerDomain, InvalidFromAddressRelayDomain, UnauthenticatedOpenRelay, AuthenticatedOpenRelay, AuthenticatedForgedFromHeader ]
 
 	def __init__(self, args):
 		self._args = args
